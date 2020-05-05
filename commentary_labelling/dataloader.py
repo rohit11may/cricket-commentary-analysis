@@ -85,7 +85,7 @@ class DataLoader(object):
     @staticmethod
     def load():
         if not DataLoader.loaded:
-            with open('../matches.json', 'r') as f:
+            with open(f'../matches.json', 'r') as f:
                 DataLoader.matches = json.load(f)
 
             with open('../player_table.json', 'r') as f:
@@ -101,6 +101,12 @@ class DataLoader(object):
                 returnTable.append([k, v])
         return returnTable
 
+    @staticmethod
+    def getHandedness(player_id, isBowler=False):
+        if player_id in DataLoader.players:
+            return DataLoader.players[player_id][f'{"bowling" if isBowler else "batting"}_hand']
+        else:
+            return "Unknown Batsman"
 
     @staticmethod
     def getAllPlayerOvers(playerName):
@@ -139,18 +145,21 @@ class DataLoader(object):
         return DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]
 
     @staticmethod
-    def store(line, length, match_id, innings, ball):
+    def storePitch(line, length, match_id, innings, ball):
         DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]['pitch']['line'] = line
         DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]['pitch']['length'] = length
 
     @staticmethod
-    def commit(name, jsonFile=False):
-        with open(f"{name}.pkl", "wb") as f:
-            pickle.dump(DataLoader.matches, f)
+    def clearPitch(match_id, innings, ball):
+        b = DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]['pitch']
+        if 'line' in b:
+            del b['line']
+            del b['length']
 
-        if jsonFile:
-            with open('matches_pitch.json', 'w') as json_file:
-                json.dump(DataLoader.matches, json_file)
+    @staticmethod
+    def commit(name):
+        with open(f'../matches_{name}.json', 'w') as json_file:
+            json.dump(DataLoader.matches, json_file)
 
     @staticmethod
     def getPlayers(match_id):
@@ -167,4 +176,5 @@ class DataLoader(object):
         returnDict['team2'] = team2players
 
         return returnDict
+
 

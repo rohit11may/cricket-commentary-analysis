@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets, QtGui, QtCore, uic
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QMetaObject
 
 import sys
 import re
@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QTreeWidgetItem
 
 from commentary_labelling.Logger import Logger
 from commentary_labelling.dataloader import DataLoader
+from commentary_labelling.runnable import ProcessRunnable
 
 logger = None
 bowlerPattern = "^(?P<bowler>[\w \-'?]+) to (?P<batsman>[\w \-']+),(?P<desc>.*)"
@@ -88,18 +89,43 @@ class Ui(QtWidgets.QMainWindow):
 
         self.players.setColumnCount(4)
         self.players.setHeaderLabels(['name', 'batting_hand', 'bowling_hand', 'role'])
+        self.player = None
 
         global logger
         logger = Logger(self.logArea)
 
         self.searchPlayer.clicked.connect(self.search)
         self.clear.clicked.connect(self.logArea.clear)
+        self.clearSelection.clicked.connect(self.clearChecked)
+
+        saveCheckedRunner = ProcessRunnable(target=self.saveChecked, args=())
+        self.pitchButtons.buttonClicked.connect(lambda: saveCheckedRunner.start())
 
         self.overs = []
+        self.completed_balls = set()
         self.current_match = None
         self.current_ball = None
 
         self.show()  # Show the GUI
+
+    def saveChecked(self):
+        if not self.overs:
+            return
+
+        m_id, inn, balls = self.overs[self.current_match]
+        line, length = self.getChecked()
+        print(f"save_checked {line}, {length}")
+        if line is not None:
+            DataLoader.storePitch(line, length, m_id, inn, balls[self.current_ball])
+            self.completed_balls.add((m_id, inn, balls[self.current_ball]))
+            self.completed.setText(str(len(self.completed_balls)))
+        else:
+            DataLoader.clearPitch(m_id, inn, balls[self.current_ball])
+
+        if len(self.completed_balls) % 10 == 0:
+            filename = f"labelled_{self.player['known_as']}"
+            logger.log(f"committing to {filename}")
+            DataLoader.commit(filename)
 
     def setChecked(self, line, length):
         name = f'btn{line}{length}'
@@ -112,7 +138,20 @@ class Ui(QtWidgets.QMainWindow):
         for btn in self.pitchButtons.buttons():
             if btn.isChecked():
                 name = btn.objectName()
-                return int(name[4]), int(name[5])
+                return int(name[3]), int(name[4])
+        return None, None
+
+    def clearChecked(self):
+        if self.overs:
+            m_id, inn, balls = self.overs[self.current_match]
+            DataLoader.clearPitch(m_id, inn, balls[self.current_ball])
+            self.completed_balls.discard((m_id, inn, balls[self.current_ball]))
+            self.completed.setText(str(len(self.completed_balls)))
+
+        self.pitchButtons.setExclusive(False)
+        for btn in self.pitchButtons.buttons():
+            btn.setChecked(False)
+        self.pitchButtons.setExclusive(True)
 
     def nextMatch(self):
         self.current_match = min(len(self.overs) - 1, self.current_match + 1)
@@ -140,10 +179,42 @@ class Ui(QtWidgets.QMainWindow):
 
     def showSelectedBall(self):
         m_id, inn, balls = self.overs[self.current_match]
-        current_ball_dict = DataLoader.getBall(m_id, inn, balls[self.current_ball])
-        match = re.match(bowlerPattern, current_ball_dict['desc'])
-        self.ballView.setText(f"{current_ball_dict['number']}, {current_ball_dict['batsman']}")
+        ball = DataLoader.getBall(m_id, inn, balls[self.current_ball])
+        match = re.match(bowlerPattern, ball['desc'])
+        batsman_name = ""
+        if ball['batsman_id'] != "":
+            batsman_name = DataLoader.players[ball['batsman_id']]['known_as']
+
+        self.ballView.setText(f"{ball['number']},"
+                              f" {ball['batsman'] if not batsman_name else batsman_name}")
         self.ballView.append(f"{match.group('desc')}")
+        self.setHandedness(ball['batsman_id'], isBowler=False)
+        if len(ball['pitch']) > 0:
+            self.setChecked(ball['pitch']['line'], ball['pitch']['length'])
+        else:
+            self.clearChecked()
+
+    def setLines(self, rightHanded=True):
+        line1 = self.line1.text()
+        line2 = self.line2.text()
+        if rightHanded and 'OFF' not in line2 or (not rightHanded and 'OFF' in line2):
+            self.line1.setText(self.line5.text())
+            self.line2.setText(self.line4.text())
+            self.line4.setText(line2)
+            self.line5.setText(line1)
+
+    def setHandedness(self, player_id, isBowler=False):
+        label = self.bowler if isBowler else self.batsman
+        hand = DataLoader.getHandedness(player_id, isBowler).upper()
+        label.setText(hand)
+        if 'RIGHT' in hand:
+            label.setAlignment(Qt.AlignRight)
+            if not isBowler: self.setLines(True)
+        elif 'LEFT' in hand:
+            label.setAlignment(Qt.AlignLeft)
+            if not isBowler: self.setLines(False)
+        else:
+            label.setAlignment(Qt.AlignCenter)
 
     def sliderValueChanged(self):
         self.current_match = self.progress.value()
@@ -194,9 +265,23 @@ class Ui(QtWidgets.QMainWindow):
         query = self.searchBox.text()
         self.overs = DataLoader.getAllPlayerOvers(query)
         logger.log(f"Fetched {len(self.overs)} innings for {query}")
+
+        self.player = DataLoader.getPlayerProfile(query)[0]
+        self.setHandedness(self.player['player_id'], isBowler=True)
+
+        self.progress.setMaximum(len(self.overs) - 1)
         self.current_match = 0
         self.current_ball = 0
-        self.progress.setMaximum(len(self.overs) - 1)
+
+        for m_id, inn, balls in self.overs:
+            for b_idx in balls:
+                thisBall = (m_id, inn, b_idx)
+                ball = DataLoader.getBall(*thisBall)
+                if len(ball['pitch']) > 0:
+                    self.completed_balls.add(thisBall)
+
+        self.completed.setText(str(len(self.completed_balls)))
+        self.totalBalls.setText(f"/{sum(list(map(len, [x[2] for x in self.overs])))}")
         self.showMatch()
 
 
