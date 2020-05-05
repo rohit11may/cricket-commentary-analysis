@@ -54,7 +54,7 @@
        <widget class="QWidget" name="widget" native="true">
         <layout class="QGridLayout" name="gridLayout_2" rowstretch="1,3,2,6,3,3,9,0" columnstretch="1,7,7,7,7,7">
          <item row="0" column="4">
-          <widget class="QLabel" name="line4">
+          <widget class="QLabel" name="line3">
            <property name="minimumSize">
             <size>
              <width>100</width>
@@ -128,7 +128,7 @@ QPushButton:checked{background-color:red; border: none;}</string>
           </widget>
          </item>
          <item row="0" column="5">
-          <widget class="QLabel" name="line5">
+          <widget class="QLabel" name="line4">
            <property name="minimumSize">
             <size>
              <width>100</width>
@@ -158,7 +158,7 @@ QPushButton:checked{background-color:red; border: none;}</string>
           </widget>
          </item>
          <item row="0" column="3">
-          <widget class="QLabel" name="line3">
+          <widget class="QLabel" name="line2">
            <property name="minimumSize">
             <size>
              <width>100</width>
@@ -367,7 +367,7 @@ QPushButton:checked{background-color:red; border: none;}</string>
           </widget>
          </item>
          <item row="0" column="2">
-          <widget class="QLabel" name="line2">
+          <widget class="QLabel" name="line1">
            <property name="minimumSize">
             <size>
              <width>100</width>
@@ -397,7 +397,7 @@ QPushButton:checked{background-color:red; border: none;}</string>
           </widget>
          </item>
          <item row="2" column="0">
-          <widget class="QLabel" name="yorker">
+          <widget class="QLabel" name="length1">
            <property name="font">
             <font>
              <family>.AppleSystemUIFont</family>
@@ -460,7 +460,7 @@ QPushButton:checked{background-color:red; border: none;}
           </widget>
          </item>
          <item row="3" column="0">
-          <widget class="QLabel" name="full">
+          <widget class="QLabel" name="length2">
            <property name="font">
             <font>
              <family>.AppleSystemUIFont</family>
@@ -565,7 +565,7 @@ QPushButton:checked{background-color:red; border: none;}
           </widget>
          </item>
          <item row="6" column="0">
-          <widget class="QLabel" name="short_length">
+          <widget class="QLabel" name="length5">
            <property name="font">
             <font>
              <family>.AppleSystemUIFont</family>
@@ -1008,7 +1008,7 @@ QPushButton:checked{background-color:red; border: none;}
           </widget>
          </item>
          <item row="1" column="0">
-          <widget class="QLabel" name="full_toss">
+          <widget class="QLabel" name="length0">
            <property name="font">
             <font>
              <family>.AppleSystemUIFont</family>
@@ -1440,7 +1440,7 @@ QPushButton:checked{background-color:red; border: none;}
           </widget>
          </item>
          <item row="5" column="0">
-          <widget class="QLabel" name="backofalength">
+          <widget class="QLabel" name="length4">
            <property name="font">
             <font>
              <family>.AppleSystemUIFont</family>
@@ -1549,7 +1549,7 @@ QPushButton:checked{background-color:red; border: none;}
           </widget>
          </item>
          <item row="4" column="0">
-          <widget class="QLabel" name="good">
+          <widget class="QLabel" name="length3">
            <property name="font">
             <font>
              <family>.AppleSystemUIFont</family>
@@ -1567,7 +1567,7 @@ QPushButton:checked{background-color:red; border: none;}
           </widget>
          </item>
          <item row="0" column="1">
-          <widget class="QLabel" name="line1">
+          <widget class="QLabel" name="line0">
            <property name="minimumSize">
             <size>
              <width>100</width>
@@ -1660,6 +1660,13 @@ QPushButton:checked{background-color:red; border: none;}
            <layout class="QHBoxLayout" name="horizontalLayout">
             <item>
              <widget class="QLineEdit" name="searchBox"/>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="openPlayerFile">
+              <property name="text">
+               <string>Open Player File</string>
+              </property>
+             </widget>
             </item>
             <item>
              <widget class="QPushButton" name="searchPlayer">
@@ -1938,14 +1945,14 @@ QPushButton:checked{background-color:red; border: none;}
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="saveas"/>
+    <addaction name="open"/>
    </widget>
    <addaction name="menuFile"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="saveas">
+  <action name="open">
    <property name="text">
-    <string>Save as...</string>
+    <string>Open</string>
    </property>
   </action>
  </widget>

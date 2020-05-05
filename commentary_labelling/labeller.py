@@ -1,9 +1,8 @@
-from PyQt5 import QtWidgets, QtGui, QtCore, uic
-from PyQt5.QtCore import Qt, QMetaObject
-
-import sys
 import re
+import sys
 
+from PyQt5 import QtWidgets, QtCore, uic
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QTreeWidgetItem
 
 from commentary_labelling.Logger import Logger
@@ -123,12 +122,15 @@ class Ui(QtWidgets.QMainWindow):
             DataLoader.clearPitch(m_id, inn, balls[self.current_ball])
 
         if len(self.completed_balls) % 10 == 0:
-            filename = f"labelled_{self.player['known_as']}"
+            filename = self.player['known_as']
             logger.log(f"committing to {filename}")
             DataLoader.commit(filename)
 
     def setChecked(self, line, length):
-        name = f'btn{line}{length}'
+        if 'OFF' not in self.line1.text():
+            line = 4 - line
+
+        name = f'btn{length}{line}'
         for btn in self.pitchButtons.buttons():
             if btn.objectName() == name:
                 btn.toggle()
@@ -138,7 +140,11 @@ class Ui(QtWidgets.QMainWindow):
         for btn in self.pitchButtons.buttons():
             if btn.isChecked():
                 name = btn.objectName()
-                return int(name[3]), int(name[4])
+                length, line = int(name[3]), int(name[4])
+                if 'OFF' not in self.line1.text():
+                    line = 4 - line
+                return line, length
+
         return None, None
 
     def clearChecked(self):
@@ -195,13 +201,13 @@ class Ui(QtWidgets.QMainWindow):
             self.clearChecked()
 
     def setLines(self, rightHanded=True):
+        line0 = self.line0.text()
         line1 = self.line1.text()
-        line2 = self.line2.text()
-        if rightHanded and 'OFF' not in line2 or (not rightHanded and 'OFF' in line2):
-            self.line1.setText(self.line5.text())
-            self.line2.setText(self.line4.text())
-            self.line4.setText(line2)
-            self.line5.setText(line1)
+        if rightHanded and 'OFF' not in line0 or (not rightHanded and 'OFF' in line0):
+            self.line0.setText(self.line4.text())
+            self.line1.setText(self.line3.text())
+            self.line4.setText(line0)
+            self.line3.setText(line1)
 
     def setHandedness(self, player_id, isBowler=False):
         label = self.bowler if isBowler else self.batsman
@@ -259,11 +265,12 @@ class Ui(QtWidgets.QMainWindow):
             data.append([b['number'], b['outcome'], match.group('desc')])
         self.overModel = TableModel(data)
         self.overView.setModel(self.overModel)
+        self.overView.resizeColumnsToContents()
         self.overView.selectionModel().selectionChanged.connect(self.selectedBallChanged)
 
     def search(self):
         query = self.searchBox.text()
-        self.overs = DataLoader.getAllPlayerOvers(query)
+        self.overs = DataLoader.getAllPlayerOvers(query, self.openPlayerFile.isChecked())
         logger.log(f"Fetched {len(self.overs)} innings for {query}")
 
         self.player = DataLoader.getPlayerProfile(query)[0]

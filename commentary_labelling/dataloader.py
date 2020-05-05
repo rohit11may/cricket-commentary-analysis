@@ -1,5 +1,5 @@
-import pickle
 from difflib import SequenceMatcher
+import os.path
 import ujson as json
 
 from commentary_labelling.Logger import Logger
@@ -83,15 +83,18 @@ class DataLoader(object):
         return [i[0] for i in sorted(returnList, key=lambda x: x[1], reverse=True)]
 
     @staticmethod
-    def load():
+    def loadMatches(player=None):
         if not DataLoader.loaded:
-            with open(f'../matches.json', 'r') as f:
+            fname = f'../matches_{player}.json' if player else '../matches.json'
+            with open(fname, 'r') as f:
                 DataLoader.matches = json.load(f)
 
-            with open('../player_table.json', 'r') as f:
-                DataLoader.players = json.load(f)
+        DataLoader.loaded = True
 
-            DataLoader.loaded = True
+    @staticmethod
+    def loadPlayers():
+        with open('../player_table.json', 'r') as f:
+            DataLoader.players = json.load(f)
 
     @staticmethod
     def getMatchDetails(match_id):
@@ -109,14 +112,20 @@ class DataLoader(object):
             return "Unknown Batsman"
 
     @staticmethod
-    def getAllPlayerOvers(playerName):
-        DataLoader.load()
+    def getAllPlayerOvers(playerName, openPlayerFile):
+        DataLoader.loadPlayers()
+
         overs = []
         try:
             profile = DataLoader.getPlayerProfile(playerName)[0]
         except:
             logger.log(f"Unable to fetch any balls for {playerName}!")
             return
+
+        if openPlayerFile:
+            DataLoader.loadMatches(profile['known_as'])
+        else:
+            DataLoader.loadMatches()
 
         p_id = profile['player_id']
 
@@ -158,7 +167,13 @@ class DataLoader(object):
 
     @staticmethod
     def commit(name):
-        with open(f'../matches_{name}.json', 'w') as json_file:
+        filename = f'../matches_{name}.json'
+        count = 0
+        while os.path.isfile(filename):
+            filename = f'../matches_{name}{count}.json'
+            count += 1
+
+        with open(filename, 'w') as json_file:
             json.dump(DataLoader.matches, json_file)
 
     @staticmethod
@@ -176,5 +191,3 @@ class DataLoader(object):
         returnDict['team2'] = team2players
 
         return returnDict
-
-
