@@ -99,6 +99,7 @@ class Ui(QtWidgets.QMainWindow):
 
         saveCheckedRunner = ProcessRunnable(target=self.saveChecked, args=())
         self.pitchButtons.buttonClicked.connect(lambda: saveCheckedRunner.start())
+        self.commit.clicked.connect(self.commitToFile)
 
         self.overs = []
         self.completed_balls = set()
@@ -106,6 +107,11 @@ class Ui(QtWidgets.QMainWindow):
         self.current_ball = None
 
         self.show()  # Show the GUI
+
+    def commitToFile(self):
+        filename = f"{self.player['known_as']}{len(self.completed_balls)}"
+        logger.log(f"committing to {filename}")
+        DataLoader.commit(filename)
 
     def saveChecked(self):
         if not self.overs:
@@ -122,9 +128,7 @@ class Ui(QtWidgets.QMainWindow):
             DataLoader.clearPitch(m_id, inn, balls[self.current_ball])
 
         if len(self.completed_balls) % 10 == 0:
-            filename = self.player['known_as']
-            logger.log(f"committing to {filename}")
-            DataLoader.commit(filename)
+            self.commitToFile()
 
     def setChecked(self, line, length):
         if 'OFF' not in self.line1.text():

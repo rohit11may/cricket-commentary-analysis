@@ -84,9 +84,17 @@ class DataLoader(object):
 
     @staticmethod
     def loadMatches(player=None):
+        if player:
+            count = 3000
+            filename = f'../matches_{player}{count}.json'
+            while not os.path.isfile(filename) and count > 0:
+                count -= 1
+                filename = f'../matches_{player}{count}.json'
+        else:
+            filename = '../matches.json'
+
         if not DataLoader.loaded:
-            fname = f'../matches_{player}.json' if player else '../matches.json'
-            with open(fname, 'r') as f:
+            with open(filename, 'r') as f:
                 DataLoader.matches = json.load(f)
 
         DataLoader.loaded = True
@@ -168,11 +176,6 @@ class DataLoader(object):
     @staticmethod
     def commit(name):
         filename = f'../matches_{name}.json'
-        count = 0
-        while os.path.isfile(filename):
-            filename = f'../matches_{name}{count}.json'
-            count += 1
-
         with open(filename, 'w') as json_file:
             json.dump(DataLoader.matches, json_file)
 
