@@ -1678,6 +1678,13 @@ QPushButton:checked{background-color:red; border: none;}
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QPushButton" name="classifyAll">
+              <property name="text">
+               <string>CLASSIFY ALL</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
           <item>
@@ -1780,11 +1787,11 @@ QPushButton:checked{background-color:red; border: none;}
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,2,2,1,10,0">
+           <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,1,0,0,0,0,0">
             <item>
              <widget class="QPushButton" name="backMatch">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
@@ -1795,35 +1802,9 @@ QPushButton:checked{background-color:red; border: none;}
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="backBall">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>&lt;</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="forwardBall">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>&gt;</string>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QPushButton" name="forwardMatch">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
@@ -1835,10 +1816,48 @@ QPushButton:checked{background-color:red; border: none;}
             </item>
             <item>
              <widget class="QPushButton" name="clearSelection">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
               <property name="text">
                <string>CLEAR SELECTION</string>
               </property>
              </widget>
+            </item>
+            <item>
+             <widget class="QSlider" name="threshold">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximum">
+               <number>100</number>
+              </property>
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="tickPosition">
+               <enum>QSlider::TicksBelow</enum>
+              </property>
+              <property name="tickInterval">
+               <number>10</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="thresholdLabel">
+              <property name="text">
+               <string>0%</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="filename"/>
             </item>
             <item>
              <widget class="QPushButton" name="commit">

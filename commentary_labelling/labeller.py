@@ -1,65 +1,18 @@
 import re
 import sys
 
-from PyQt5 import QtWidgets, QtCore, uic
+from PyQt5 import QtWidgets, uic
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QTreeWidgetItem
 
 from commentary_labelling.Logger import Logger
+from commentary_labelling.classifier import Classifier
 from commentary_labelling.dataloader import DataLoader
 from commentary_labelling.runnable import ProcessRunnable
+from commentary_labelling.ui_utils import TableModel
 
 logger = None
 bowlerPattern = "^(?P<bowler>[\w \-'?]+) to (?P<batsman>[\w \-']+),(?P<desc>.*)"
-
-
-class ViewTree(QtWidgets.QTreeWidget):
-    def __init__(self, value):
-        super().__init__()
-
-        def fill_item(item, value):
-            def new_item(parent, text, val=None):
-                child = QtWidgets.QTreeWidgetItem([text])
-                fill_item(child, val)
-                parent.addChild(child)
-                child.setExpanded(True)
-
-            if value is None:
-                return
-            elif isinstance(value, dict):
-                for key, val in sorted(value.items()):
-                    new_item(item, str(key), val)
-            elif isinstance(value, (list, tuple)):
-                for val in value:
-                    text = (str(val) if not isinstance(val, (dict, list, tuple))
-                            else '[%s]' % type(val).__name__)
-                    new_item(item, text, val)
-            else:
-                new_item(item, str(value))
-
-        fill_item(self.invisibleRootItem(), value)
-
-
-class TableModel(QtCore.QAbstractTableModel):
-    def __init__(self, data):
-        super(TableModel, self).__init__()
-        self._data = data
-
-    def data(self, index, role):
-        if role == Qt.DisplayRole:
-            # See below for the nested-list data structure.
-            # .row() indexes into the outer list,
-            # .column() indexes into the sub-list
-            return self._data[index.row()][index.column()]
-
-    def rowCount(self, index):
-        # The length of the outer list.
-        return len(self._data)
-
-    def columnCount(self, index):
-        # The following takes the first sub-list, and returns
-        # the length (only works if all rows are an equal length)
-        return len(self._data[0])
 
 
 class Ui(QtWidgets.QMainWindow):
@@ -81,10 +34,9 @@ class Ui(QtWidgets.QMainWindow):
         self.match_details.setModel(self.detailModel)
 
         self.progress.valueChanged.connect(self.sliderValueChanged)
+        self.threshold.valueChanged.connect(self.thresholdValueChanged)
         self.forwardMatch.clicked.connect(self.nextMatch)
         self.backMatch.clicked.connect(self.previousMatch)
-        self.forwardBall.clicked.connect(self.nextBall)
-        self.backBall.clicked.connect(self.previousBall)
 
         self.players.setColumnCount(4)
         self.players.setHeaderLabels(['name', 'batting_hand', 'bowling_hand', 'role'])
@@ -101,7 +53,11 @@ class Ui(QtWidgets.QMainWindow):
         self.pitchButtons.buttonClicked.connect(lambda: saveCheckedRunner.start())
         self.commit.clicked.connect(self.commitToFile)
 
-        self.overs = []
+        self.classifyAll.clicked.connect(self.classifyBalls)
+        self.current_threshold = 0
+
+        # [(match id, innings, list of ball indices from that innings)]
+        self.all_overs = []
         self.completed_balls = set()
         self.current_match = None
         self.current_ball = None
@@ -110,16 +66,41 @@ class Ui(QtWidgets.QMainWindow):
 
     def commitToFile(self):
         filename = f"{self.player['known_as']}{len(self.completed_balls)}"
+        if self.filename.text():
+            filename = self.filename.text()
+
         logger.log(f"committing to {filename}")
         DataLoader.commit(filename)
 
-    def saveChecked(self):
-        if not self.overs:
+    def classifyBalls(self):
+        if not self.all_overs:
             return
 
-        m_id, inn, balls = self.overs[self.current_match]
+        for i, (m_id, inn, balls) in enumerate(self.all_overs):
+            if i % 10 == 0:
+                print(f"Done {i} matches!")
+
+            for b_idx in balls:
+                thisBall = (m_id, inn, b_idx)
+                ballData = DataLoader.getBall(*thisBall)
+                if len(ballData['pitch']) == 0:
+                    classification = Classifier.classify(ballData['desc'])
+                    if not classification:
+                        continue
+                    (line, line_conf), (length, length_conf) = classification
+                    DataLoader.storePitch(line, length, m_id, inn, b_idx,
+                                          line_conf=line_conf, length_conf=length_conf)
+                    self.completed_balls.add(thisBall)
+
+        self.completed.setText(str(len(self.completed_balls)))
+
+    def saveChecked(self):
+        if not self.all_overs:
+            return
+
+        m_id, inn, balls = self.all_overs[self.current_match]
         line, length = self.getChecked()
-        print(f"save_checked {line}, {length}")
+        # print(f"save_checked {line}, {length}")
         if line is not None:
             DataLoader.storePitch(line, length, m_id, inn, balls[self.current_ball])
             self.completed_balls.add((m_id, inn, balls[self.current_ball]))
@@ -127,8 +108,8 @@ class Ui(QtWidgets.QMainWindow):
         else:
             DataLoader.clearPitch(m_id, inn, balls[self.current_ball])
 
-        if len(self.completed_balls) % 10 == 0:
-            self.commitToFile()
+        # if len(self.completed_balls) % 10 == 0:
+        #     self.commitToFile()
 
     def setChecked(self, line, length):
         if 'OFF' not in self.line1.text():
@@ -152,8 +133,8 @@ class Ui(QtWidgets.QMainWindow):
         return None, None
 
     def clearChecked(self):
-        if self.overs:
-            m_id, inn, balls = self.overs[self.current_match]
+        if self.all_overs:
+            m_id, inn, balls = self.all_overs[self.current_match]
             DataLoader.clearPitch(m_id, inn, balls[self.current_ball])
             self.completed_balls.discard((m_id, inn, balls[self.current_ball]))
             self.completed.setText(str(len(self.completed_balls)))
@@ -164,23 +145,12 @@ class Ui(QtWidgets.QMainWindow):
         self.pitchButtons.setExclusive(True)
 
     def nextMatch(self):
-        self.current_match = min(len(self.overs) - 1, self.current_match + 1)
+        self.current_match = min(len(self.all_overs) - 1, self.current_match + 1)
         self.showMatch()
 
     def previousMatch(self):
         self.current_match = max(0, self.current_match - 1)
         self.showMatch()
-
-    def nextBall(self):
-        if self.overs:
-            self.current_ball = min(len(self.overs[self.current_match][2]) - 1, self.current_ball + 1)
-            self.overView.selectRow(self.current_ball)
-            self.showSelectedBall()
-
-    def previousBall(self):
-        self.current_ball = max(0, self.current_ball - 1)
-        self.overView.selectRow(self.current_ball)
-        self.showSelectedBall()
 
     def selectedBallChanged(self):
         indexes = self.overView.selectionModel().selectedRows()
@@ -188,7 +158,7 @@ class Ui(QtWidgets.QMainWindow):
         self.showSelectedBall()
 
     def showSelectedBall(self):
-        m_id, inn, balls = self.overs[self.current_match]
+        m_id, inn, balls = self.all_overs[self.current_match]
         ball = DataLoader.getBall(m_id, inn, balls[self.current_ball])
         match = re.match(bowlerPattern, ball['desc'])
         batsman_name = ""
@@ -198,9 +168,12 @@ class Ui(QtWidgets.QMainWindow):
         self.ballView.setText(f"{ball['number']},"
                               f" {ball['batsman'] if not batsman_name else batsman_name}")
         self.ballView.append(f"{match.group('desc')}")
+
         self.setHandedness(ball['batsman_id'], isBowler=False)
         if len(ball['pitch']) > 0:
             self.setChecked(ball['pitch']['line'], ball['pitch']['length'])
+            self.ballView.append(f"\nLength confidence: {ball['pitch']['length_conf']*100:.1f}")
+            self.ballView.append(f"Line confidence: {ball['pitch']['line_conf']*100:.1f}")
         else:
             self.clearChecked()
 
@@ -232,13 +205,17 @@ class Ui(QtWidgets.QMainWindow):
         self.showMatch()
         self.showSelectedBall()
 
+    def thresholdValueChanged(self):
+        self.current_threshold = self.threshold.value()
+        self.thresholdLabel.setText(f"{self.current_threshold}%")
+
     def showMatch(self):
         self.showOverview()
         self.showMatchDetails()
         self.showPlayerTree()
 
     def showPlayerTree(self):
-        match_id, inn, balls = self.overs[self.current_match]
+        match_id, inn, balls = self.all_overs[self.current_match]
         players = DataLoader.getPlayers(match_id)
         self.players.clear()
         team1 = QTreeWidgetItem(['team1'])
@@ -253,15 +230,15 @@ class Ui(QtWidgets.QMainWindow):
         self.players.expandAll()
 
     def showMatchDetails(self):
-        match_id, inn, balls = self.overs[self.current_match]
+        match_id, inn, balls = self.all_overs[self.current_match]
         details = DataLoader.getMatchDetails(match_id)
         self.detailModel = TableModel(details)
         self.match_details.setModel(self.detailModel)
-        self.oversLeft.setText(f"{self.current_match + 1}/{len(self.overs)}")
+        self.oversLeft.setText(f"{self.current_match + 1}/{len(self.all_overs)}")
         return match_id
 
     def showOverview(self):
-        match_id, inn, balls = self.overs[self.current_match]
+        match_id, inn, balls = self.all_overs[self.current_match]
         data = []
         for ball in balls:
             b = DataLoader.getBall(match_id, inn, ball)
@@ -274,17 +251,17 @@ class Ui(QtWidgets.QMainWindow):
 
     def search(self):
         query = self.searchBox.text()
-        self.overs = DataLoader.getAllPlayerOvers(query, self.openPlayerFile.isChecked())
-        logger.log(f"Fetched {len(self.overs)} innings for {query}")
+        self.all_overs = DataLoader.getAllPlayerOvers(query, self.openPlayerFile.isChecked())
+        logger.log(f"Fetched {len(self.all_overs)} innings for {query}")
 
         self.player = DataLoader.getPlayerProfile(query)[0]
         self.setHandedness(self.player['player_id'], isBowler=True)
 
-        self.progress.setMaximum(len(self.overs) - 1)
+        self.progress.setMaximum(len(self.all_overs) - 1)
         self.current_match = 0
         self.current_ball = 0
 
-        for m_id, inn, balls in self.overs:
+        for m_id, inn, balls in self.all_overs:
             for b_idx in balls:
                 thisBall = (m_id, inn, b_idx)
                 ball = DataLoader.getBall(*thisBall)
@@ -292,7 +269,7 @@ class Ui(QtWidgets.QMainWindow):
                     self.completed_balls.add(thisBall)
 
         self.completed.setText(str(len(self.completed_balls)))
-        self.totalBalls.setText(f"/{sum(list(map(len, [x[2] for x in self.overs])))}")
+        self.totalBalls.setText(f"/{sum(list(map(len, [x[2] for x in self.all_overs])))}")
         self.showMatch()
 
 

@@ -85,13 +85,13 @@ class DataLoader(object):
     @staticmethod
     def loadMatches(player=None):
         if player:
-            count = 3000
+            count = 7000
             filename = f'../matches_{player}{count}.json'
             while not os.path.isfile(filename) and count > 0:
                 count -= 1
                 filename = f'../matches_{player}{count}.json'
         else:
-            filename = '../matches.json'
+            filename = '../matches_labelled.json'
 
         if not DataLoader.loaded:
             with open(filename, 'r') as f:
@@ -162,9 +162,12 @@ class DataLoader(object):
         return DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]
 
     @staticmethod
-    def storePitch(line, length, match_id, innings, ball):
-        DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]['pitch']['line'] = line
-        DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]['pitch']['length'] = length
+    def storePitch(line, length, match_id, innings, ball, line_conf=100, length_conf=100):
+        pitch = DataLoader.matches[match_id]['commentary'][f'innings{innings}']['balls'][ball]['pitch']
+        pitch['line'] = line
+        pitch['length'] = length
+        pitch['line_conf'] = line_conf
+        pitch['length_conf'] = length_conf
 
     @staticmethod
     def clearPitch(match_id, innings, ball):
